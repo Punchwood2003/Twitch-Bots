@@ -2,40 +2,49 @@ from twitchAPI.chat import Chat, EventData, ChatMessage, ChatSub, ChatCommand
 from twitchAPI.type import AuthScope, ChatEvent
 from twitchAPI.oauth import UserAuthenticator
 from twitchAPI.twitch import Twitch
+
 from os import getenv
 from dotenv import load_dotenv
 import asyncio
 import random
 import time
 
-# Set up constants
+# Set up auth-related constants
 load_dotenv()
 APP_ID = getenv('BOT_CLIENT_ID')
 APP_SECRET = getenv('BOT_CLIENT_SECRET')
-USER_SCOPE = [AuthScope.CHAT_READ, AuthScope.CHAT_EDIT, AuthScope.CHANNEL_MANAGE_BROADCAST]
+USER_SCOPE = [
+    AuthScope.CHAT_READ, 
+    AuthScope.CHAT_EDIT, 
+    AuthScope.CHANNEL_MANAGE_BROADCAST
+]
 TARGET_CHANNEL = getenv('TWITCH_CHANNEL')
+
+# Used for the copy-pasta
+SLEEP_TIME = float(getenv('SLEEP_TIME', 2.5))
+MSGS = [
+    "Crazy?",
+    "I was crazy once.",
+    "They locked me in a room.",
+    "A rubber room.",
+    "A rubber room with rats.",
+    "And rats make me crazy."
+]
 
 # Listen for chat messages
 async def on_message(msg: ChatMessage):
-    print(f'{msg.user.display_name}: "{msg.text}"')
     # Check to see if the message contains the string "that's crazy"
     if 'that\'s crazy' in msg.text.lower() or msg.text.lower() == "crazy?":
         # Get a random number between 1 and 10
         random_number = random.randint(1, 3)
         # 33% chance to respond with copy-pasta
-        if random_number == 1:
-            print('WINNER!!!!')
-            await msg.reply('Crazy?')
-            time.sleep(1)
-            await msg.reply('I was crazy once.')
-            time.sleep(1)
-            await msg.reply('They locked me in a room.')
-            time.sleep(1)
-            await msg.reply('A rubber room.')
-            time.sleep(1)
-            await msg.reply('A rubber room with rats.')
-            time.sleep(1)
-            await msg.reply('And rats make me crazy.')
+        if random_number != 1:
+            return
+        
+        # Respond with the copy-pasta
+        for line in MSGS:
+            await msg.reply(line)
+            time.sleep(SLEEP_TIME)
 
 
 # Bot connected successfully
@@ -59,6 +68,7 @@ async def run_bot():
     # Register events 
     chat.register_event(ChatEvent.READY, on_ready)
     chat.register_event(ChatEvent.MESSAGE, on_message)
+    chat.register_event(ChatEvent.)
 
     # Start the chat bot
     chat.start()
