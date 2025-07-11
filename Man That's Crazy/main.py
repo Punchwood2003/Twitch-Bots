@@ -68,7 +68,6 @@ async def run_bot():
     # Register events 
     chat.register_event(ChatEvent.READY, on_ready)
     chat.register_event(ChatEvent.MESSAGE, on_message)
-    chat.register_event(ChatEvent.)
 
     # Start the chat bot
     chat.start()
