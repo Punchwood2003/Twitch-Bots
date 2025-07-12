@@ -28,6 +28,8 @@ AUTOMATIC_RESET = bool(getenv('AUTOMATIC_RESET', False))
 TWITCH_CHANNEL = getenv('TWITCH_CHANNEL')
 BOT_NAME = getenv('BOT_NAME')
 DEFAULT_POINTS = int(getenv('DEFAULT_POINTS', 1000))
+BLACKLISTED_USERS = [user.strip().replace('\n', '').replace('\r', '') for user in getenv('BLACKLISTED_USERS', '').split(',') 
+                     if user.strip().replace('\n', '').replace('\r', '')]
 
 
 # Main business logic for the charity/gambling bot
@@ -73,6 +75,7 @@ async def handle_charity(broadcaster: Twitch, chat: Chat, room: ChatRoom, broadc
 
     # Determine whether the points are going to a subscriber in chat or a random chatter
     chatters = await get_active_chatters(chat.twitch, broadcaster_id, moderator_id)
+    chatters = [chatter for chatter in chatters if chatter.user_name not in BLACKLISTED_USERS]
     active_subscribers = None
     isSub = False
     if random.random() <= SUB_CHANCE:
