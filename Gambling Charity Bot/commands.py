@@ -13,11 +13,12 @@ from dotenv import load_dotenv
 load_dotenv()
 DEFAULT_POINTS = int(getenv('DEFAULT_POINTS', 1000))
 BOT_NAME = getenv('BOT_NAME')
+TWITCH_CHANNEL = getenv('TWITCH_CHANNEL')
 
 
 # Used to verify permissions for commands
 def is_allowed_user(user: ChatUser):
-    return user.user_type == 'mod' or user.user_type == 'broadcaster'
+    return user.mod or user.name == TWITCH_CHANNEL
 
 
 # Defines the behavior of the "!charityenable" command
