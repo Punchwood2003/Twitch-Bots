@@ -1,0 +1,11 @@
+# Twitch Bots Project Requirements
+# Main dependencies for the complete project including feature flags system
+
+# === CORE FEATURE FLAGS DEPENDENCIES ===
+# Required for the feature flag system to function
+watchdog>=6.0.0          # File system monitoring for real-time config updates
+pydantic>=2.11.0         # Data validation and settings management
+
+# === TWITCH BOT DEPENDENCIES ===
+# Required to interact with Twitch streams and chat
+twitchAPI>=4.5.0         # Twitch API wrapper

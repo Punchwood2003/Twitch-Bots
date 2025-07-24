@@ -1,0 +1,15 @@
+# Minimal Requirements - Core Feature Flags System Only
+# This file contains only the essential dependencies needed for the feature flag system
+
+# Core feature flag dependencies
+watchdog==6.0.0          # File system monitoring - DO NOT CHANGE VERSION
+pydantic==2.11.7         # Data validation - DO NOT CHANGE VERSION
+
+# Required by pydantic (auto-installed but listed for clarity)
+pydantic_core==2.33.2   # Pydantic's Rust core
+annotated-types==0.7.0  # Type annotations support
+typing_extensions==4.14.1 # Enhanced typing (required by pydantic)
+typing-inspection==0.4.1  # Runtime typing introspection (required by pydantic)
+
+# Twitch bot dependencies
+twitchAPI==4.5.0         # Twitch API wrapper
