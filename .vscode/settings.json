@@ -1,0 +1,26 @@
+{
+    "python.defaultInterpreterPath": "./venv/Scripts/python.exe",
+    "python.terminal.activateEnvironment": true,
+    "terminal.integrated.env.windows": {
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONUTF8": "1"
+    },
+    "terminal.integrated.shellArgs.windows": [
+        "/k",
+        "chcp 65001 >nul"
+    ],
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "project_tests"
+    ],
+    "files.associations": {
+        "*.json": "json"
+    },
+    "editor.rulers": [
+        88
+    ],
+    "python.formatting.provider": "black",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true
+}
