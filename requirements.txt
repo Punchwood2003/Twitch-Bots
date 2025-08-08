@@ -1,10 +1,17 @@
 # Twitch Bots Project Requirements
-# Main dependencies for the complete project including feature flags system
+# Complete dependencies for all project components
 
-# === CORE FEATURE FLAGS DEPENDENCIES ===
-# Required for the feature flag system to function
+# === FEATURE FLAGS DEPENDENCIES ===
+# Required for the feature flag system
 watchdog>=6.0.0          # File system monitoring for real-time config updates
 pydantic>=2.11.0         # Data validation and settings management
+
+# === DATABASE DEPENDENCIES ===
+# Required for Supabase PostgreSQL database integration
+sqlalchemy>=2.0.0        # Modern async ORM with full SQL support
+asyncpg>=0.29.0          # High-performance async PostgreSQL driver
+supabase>=2.0.0          # Supabase Python client
+pydantic-settings>=2.0.0 # Settings management with validation
 
 # === TWITCH BOT DEPENDENCIES ===
 # Required to interact with Twitch streams and chat

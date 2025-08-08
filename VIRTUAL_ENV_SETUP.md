@@ -1,4 +1,4 @@
-# Feature Flags Virtual Environment Setup
+# Twitch Bots Virtual Environment Setup
 
 ## Quick Setup (Recommended)
 ```bash
@@ -11,18 +11,36 @@ venv\Scripts\activate
 # Mac/Linux:
 source venv/bin/activate
 
-# Install dependencies
+# Install full dependencies (recommended)
 pip install -r requirements.txt
 
-# Run tests
+# OR install minimal dependencies (feature flags + basic bot only)
+pip install -r requirements-minimal.txt
+
+# Run tests to verify setup
 python project_tests/run_all_tests.py
 ```
+
+## Installation Options
+
+### Full Installation (`requirements.txt`)
+**Recommended for development and full functionality**
+- Feature flags system with file monitoring
+- Database integration (PostgreSQL/async)
+- Twitch API integration
+- Complete testing suite
+
+### Minimal Installation (`requirements-minimal.txt`)
+**For basic feature flags and bot functionality only**
+- Core feature flags system
+- Basic Twitch bot capabilities
+- No database dependencies
 
 ## Why Use Virtual Environment for This Project?
 
 ### 1. **Dependency Isolation**
 - Prevents conflicts with other Python projects
-- Ensures consistent `watchdog` version for file monitoring
+- Ensures consistent package versions across environments
 - Isolates `pydantic` for data validation
 
 ### 2. **Reproducible Environment**

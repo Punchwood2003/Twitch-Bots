@@ -1,4 +1,4 @@
-# Testing Suite
+# Project Tests
 
 ## 📋 **Overview**
 
@@ -8,61 +8,106 @@ This directory contains the comprehensive testing suite for the different system
 
 ```
 project_tests/
-├── README.md         # This documentation
-├── .temp/            # Temporary test files (gitignored)
-│   └── .gitignore    # Automatically ignores *.json files
-├── run_all_tests.py  # Main test orchestrator
-└── feature_flags/    # Feature flag test suite
+├── README.md                   # This documentation
+├── run_all_tests.py            # Comprehensive test runner
+├── db_tests/                   # Database infrastructure tests
+└── feature_flags/              # Feature flags system tests
 ```
 
-## 🧪 **Test Files Overview**
+## 🏃‍♂️ **Quick Start**
 
-### **Core Test Suite**
+```bash
+# Run all tests
+python run_all_tests.py
 
-#### 🔧 **`run_all_tests.py`** - Test Orchestrator
-- **Purpose**: Central entry point for all test execution
-- **Features**: 
-  - Individual test selection (`--test basic`, `--test advanced`)
-  - Verbose output mode (`--verbose`)
-  - Pass/fail tracking with summary reporting
-  - Subprocess management with UTF-8 environment
+# Run specific test suite
+python run_all_tests.py --suite database
+python run_all_tests.py --suite feature_flags
+
+# List available test suites
+python run_all_tests.py --list
+
+# Verbose output for debugging
+python run_all_tests.py --verbose
+```
+
+## 🧪 **Test Suites**
+
+### Database Infrastructure Tests (`--suite database`)
+- **Quick Check**: Fast connectivity verification
+- **Full Suite**: Comprehensive database infrastructure validation
+  - Configuration loading and validation
+  - Connection lifecycle management  
+  - Schema manager functionality
+  - Module integration testing
+
+### Feature Flags System Tests (`--suite feature_flags`)
+- **Basic**: Core feature flag operations
+- **Advanced**: Complex scenarios and edge cases
+- **Multi-process**: Concurrent access simulation
+
+## 📃 **Test Runner Features**
+
+- 🧪 **Unified Interface**: Single command to run all project tests
+- 📊 **Detailed Reports**: Success rates, timing, and failure analysis
+- 🎯 **Selective Testing**: Run individual suites or all tests
+- 🔍 **Debug Support**: Verbose mode for troubleshooting
+- ⏱️ **Performance Tracking**: Execution time monitoring
+
+## 🏗️ **Architecture**
+
+The comprehensive test runner (`run_all_tests.py`) manages test execution across:
+
+1. **Database Infrastructure** (`db_tests/`)
+   - Configuration validation
+   - Connection management
+   - Schema operations
+   - Integration testing
+
+2. **Feature Flags System** (`feature_flags/`)
+   - Basic functionality
+   - Advanced features
+   - Multi-process scenarios
 
 ## 🚀 **Usage Examples**
 
-### **Running Tests**
-
+### Running All Tests
 ```bash
-# Run all tests from project root
-python project_tests/run_all_tests.py
+# Run complete test suite
+python run_all_tests.py
 
-# Run specific test categories
-python project_tests/run_all_tests.py --test basic
-python project_tests/run_all_tests.py --test advanced
-python project_tests/run_all_tests.py --test multiprocess
-
-# Enable verbose output for troubleshooting
-python project_tests/run_all_tests.py --verbose
-
-# Run individual test files directly
-python project_tests/feature_flags/test_basic_functionality.py
-python project_tests/feature_flags/debug_feature_flags.py
+# Expected output:
+# 🧪 COMPREHENSIVE PROJECT TEST SUITE 🧪
+# 🚀 STARTING DATABASE TEST SUITE
+# 🚀 STARTING FEATURE_FLAGS TEST SUITE
+# ...
+# 🎉 ALL TESTS PASSED! Project infrastructure is working correctly.
 ```
 
-### **From Different Directories**
-
+### Running Specific Test Suites
 ```bash
-# Works from project root
-python project_tests/run_all_tests.py
+# Database tests only
+python run_all_tests.py --suite database
 
-# Also works from project_tests directory
-cd project_tests
-python run_all_tests.py --test basic
-python feature_flags/debug_feature_flags.py
+# Feature flags tests only
+python run_all_tests.py --suite feature_flags
 ```
 
-## 🗃️ **File Organization Features**
+### Debugging Failed Tests
+```bash
+# Verbose output for troubleshooting
+python run_all_tests.py --verbose
 
-### **Organized Temporary Files**
-- All test configurations stored in `project_tests/.temp/`
-- Automatic cleanup after test completion
-- Gitignored temporary files
+# List all available test suites
+python run_all_tests.py --list
+```
+
+### Running Individual Tests
+```bash
+# Direct test execution
+cd db_tests
+python run_db_tests.py --quick
+
+cd ../feature_flags
+python test_basic_functionality.py
+```
