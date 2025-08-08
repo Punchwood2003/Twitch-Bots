@@ -101,6 +101,7 @@ async def handle_charity(broadcaster: Twitch, chat: Chat, room: ChatRoom, broadc
         await chat.send_message(room, f'@{winner.user_name}, thank you for stopping by the stream today! Here are some points to show my appreciation!')
         sleep(2)
         await chat.send_message(room, f'!givepoints {winner.user_name} all')
+        sleep(2)
     
     # Give the points to a random chatter
     else:
@@ -114,6 +115,7 @@ async def handle_charity(broadcaster: Twitch, chat: Chat, room: ChatRoom, broadc
         await chat.send_message(room, f'@{winner.user_name}, thank you for being a loyal subscriber! Here are some points to show my appreciation!')
         sleep(2)
         await chat.send_message(room, f'!givepoints {winner.user_name} all')
+        sleep(2)
 
     # If the bot is set to automatically reset the points after a charity action, do so
     if AUTOMATIC_RESET:
@@ -145,7 +147,9 @@ async def handle_gambling(chat: Chat, room: ChatRoom):
     # Detemrine whether the bot is going all-in or just a standard gamble action
     if random.random() <= ALL_IN_CHANCE:
         await chat.send_message(room, 'Chat, we are going ALL IN!')
+        sleep(2)
         await chat.send_message(room, '!gamble all')
+        sleep(2)
         print('\tWent all in')
         return
 
