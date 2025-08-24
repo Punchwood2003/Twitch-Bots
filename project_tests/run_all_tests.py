@@ -4,12 +4,14 @@ Comprehensive Test Suite Runner
 This script runs all tests across the entire project in the correct order:
 1. Database infrastructure tests (configuration, connections, schemas)
 2. Feature flag tests (basic, advanced, multi-process)
+3. Module system tests (registration, lifecycle, integration)
 
 Usage:
     python run_all_tests.py
     python run_all_tests.py --verbose
     python run_all_tests.py --suite database
     python run_all_tests.py --suite feature_flags
+    python run_all_tests.py --suite modules
     python run_all_tests.py --suite all
 """
 
@@ -69,6 +71,12 @@ class ComprehensiveTestRunner:
         ff_suite.add_test("advanced", base_dir / "feature_flags" / "test_advanced_feature_flags.py", [], "Advanced features")
         ff_suite.add_test("multiprocess", base_dir / "feature_flags" / "test_multi_process_feature_flags.py", [], "Multi-process simulation")
         self.suites["feature_flags"] = ff_suite
+        
+        # Module System Test Suite
+        module_suite = TestSuite("modules", "Module Management System Tests")
+        module_suite.add_test("simple", base_dir / "module_tests" / "simple_module_test.py", [], "Basic module functionality")
+        module_suite.add_test("comprehensive", base_dir / "module_tests" / "test_module_system.py", [], "Complete module system test")
+        self.suites["modules"] = module_suite
     
     def run_test(self, test_name: str, test_path: Path, args: list = None, verbose: bool = False) -> bool:
         """Run a single test file."""
@@ -198,7 +206,7 @@ class ComprehensiveTestRunner:
 def main():
     """Main test runner entry point."""
     parser = argparse.ArgumentParser(description="Run comprehensive project tests")
-    parser.add_argument("--suite", choices=["all", "database", "feature_flags"], 
+    parser.add_argument("--suite", choices=["all", "database", "feature_flags", "modules"], 
                        default="all", help="Test suite to run")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--list", action="store_true", help="List available test suites")
