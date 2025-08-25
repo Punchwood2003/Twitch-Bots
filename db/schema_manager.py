@@ -7,12 +7,15 @@ to register its own tables, indexes, and migrations dynamically.
 
 import asyncio
 import importlib
+import logging
 import pkgutil
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Protocol
 from dataclasses import dataclass
 import asyncpg
 
+# Set up logger
+logger = logging.getLogger(__name__)
 from .config import get_database_config
 
 
@@ -66,7 +69,7 @@ class SchemaManager:
         
         # Register the schema
         self.registered_modules[module_name] = schema
-        print(f"✅ Schema declared for module: {module_name}")
+        logger.info(f"Schema declared for module: {module_name}")
         
         # Auto-sync if enabled (handle async context safely)
         if self._auto_sync:
@@ -76,7 +79,7 @@ class SchemaManager:
                 loop.create_task(self._sync_module_schema(module_name))
             except RuntimeError:
                 # No running event loop, schedule for later or sync manually
-                print(f"📝 Schema for {module_name} registered. Run sync_all_schemas() to apply changes.")
+                logger.info(f"Schema for {module_name} registered. Run sync_all_schemas() to apply changes.")
                 # Store for later sync
                 if not hasattr(self, '_pending_sync'):
                     self._pending_sync = set()
@@ -87,14 +90,14 @@ class SchemaManager:
         try:
             schema = self.registered_modules.get(module_name)
             if not schema:
-                print(f"⚠️  Module {module_name} not found for sync")
+                logger.warning(f"Module {module_name} not found for sync")
                 return False
             
             # Check dependencies first
             missing_deps = await self._check_dependencies(schema)
             if missing_deps:
-                print(f"⚠️  Module {module_name} has missing dependencies: {missing_deps}")
-                print(f"   Deferring schema creation until dependencies are available")
+                logger.warning(f"Module {module_name} has missing dependencies: {missing_deps}")
+                logger.warning(f"Deferring schema creation until dependencies are available")
                 return False
             
             conn = await asyncpg.connect(
@@ -105,27 +108,27 @@ class SchemaManager:
                 database=self.config.db_name,
             )
             
-            print(f"🔄 Syncing schema for module: {module_name}")
+            logger.info(f"Syncing schema for module: {module_name}")
             
             # Create tables
             for table in schema.tables:
-                print(f"   🔨 Creating table: {table.name}")
+                logger.debug(f"Creating table: {table.name}")
                 await conn.execute(table.sql)
             
             # Create indexes
             if schema.indexes:
-                print(f"   📇 Creating indexes for {module_name}")
+                logger.debug(f"Creating indexes for {module_name}")
                 for index_sql in schema.indexes:
                     await conn.execute(index_sql)
             
             # Insert initial data
             if schema.initial_data:
-                print(f"   📊 Inserting initial data for {module_name}")
+                logger.debug(f"Inserting initial data for {module_name}")
                 for data_sql in schema.initial_data:
                     await conn.execute(data_sql)
             
             await conn.close()
-            print(f"   ✅ Module {module_name} schema synced successfully")
+            logger.info(f"Module {module_name} schema synced successfully")
             
             # Try to sync any dependent modules that were waiting
             await self._sync_waiting_modules()
@@ -133,7 +136,7 @@ class SchemaManager:
             return True
             
         except Exception as e:
-            print(f"❌ Schema sync failed for module {module_name}: {e}")
+            logger.error(f"Schema sync failed for module {module_name}: {e}")
             return False
     
     async def _check_dependencies(self, schema: ModuleSchema) -> List[str]:
@@ -190,7 +193,7 @@ class SchemaManager:
     def set_auto_sync(self, enabled: bool) -> None:
         """Enable or disable automatic schema synchronization."""
         self._auto_sync = enabled
-        print(f"✅ Auto-sync {'enabled' if enabled else 'disabled'}")
+        logger.info(f"Auto-sync {'enabled' if enabled else 'disabled'}")
     
     def register_module(self, module_name: str, schema: ModuleSchema) -> None:
         """
@@ -198,14 +201,14 @@ class SchemaManager:
         
         Prefer using declare_schema() instead.
         """
-        print(f"⚠️  Using legacy register_module. Consider using declare_schema() instead.")
+        logger.warning(f"Using legacy register_module. Consider using declare_schema() instead.")
         self.declare_schema(module_name, schema)
     
     def discover_modules(self, base_path: str = "modules") -> None:
         """Auto-discover modules with schema definitions."""
         base_dir = Path(base_path)
         if not base_dir.exists():
-            print(f"⚠️  Module directory {base_path} does not exist")
+            logger.warning(f"Module directory {base_path} does not exist")
             return
         
         for module_path in base_dir.iterdir():
@@ -220,7 +223,7 @@ class SchemaManager:
                         self.register_module(module_path.name, schema)
                         
                 except Exception as e:
-                    print(f"⚠️  Failed to load module {module_path.name}: {e}")
+                    logger.warning(f"Failed to load module {module_path.name}: {e}")
     
     def get_dependency_order(self) -> List[str]:
         """Calculate proper table creation order based on dependencies."""
