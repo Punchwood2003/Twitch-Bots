@@ -14,9 +14,6 @@ source venv/bin/activate
 # Install full dependencies (recommended)
 pip install -r requirements.txt
 
-# OR install minimal dependencies (feature flags + basic bot only)
-pip install -r requirements-minimal.txt
-
 # Run tests to verify setup
 python project_tests/run_all_tests.py
 ```
@@ -29,12 +26,6 @@ python project_tests/run_all_tests.py
 - Database integration (PostgreSQL/async)
 - Twitch API integration
 - Complete testing suite
-
-### Minimal Installation (`requirements-minimal.txt`)
-**For basic feature flags and bot functionality only**
-- Core feature flags system
-- Basic Twitch bot capabilities
-- No database dependencies
 
 ## Why Use Virtual Environment for This Project?
 

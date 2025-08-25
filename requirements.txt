@@ -16,3 +16,5 @@ pydantic-settings>=2.0.0 # Settings management with validation
 # === TWITCH BOT DEPENDENCIES ===
 # Required to interact with Twitch streams and chat
 twitchAPI>=4.5.0         # Twitch API wrapper
+psutil>=6.0.0            # Process and system monitoring for graceful shutdown
+python-dotenv>=1.0.0     # Environment variable management from .env files
