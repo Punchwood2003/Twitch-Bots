@@ -8,6 +8,7 @@ feature flags, database management, and module lifecycle management.
 import asyncio
 import logging
 import os
+import sys
 import threading
 from pathlib import Path
 from dotenv import load_dotenv
@@ -380,10 +381,38 @@ async def main():
             await bot.stop()
         except Exception as e:
             logger.error(f"Error during final cleanup: {e}")
+        
+        # Force close any remaining tasks and the event loop
+        try:
+            # Get the current task to avoid cancelling ourselves
+            current_task = asyncio.current_task()
+            
+            # Cancel all remaining tasks except the current one
+            pending = [task for task in asyncio.all_tasks() if task is not current_task and not task.done()]
+            
+            if pending:
+                logger.debug(f"Cancelling {len(pending)} remaining tasks...")
+                for task in pending:
+                    task.cancel()
+                
+                # Wait briefly for cancellation to complete, but don't wait too long
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*pending, return_exceptions=True),
+                        timeout=2.0
+                    )
+                except asyncio.TimeoutError:
+                    logger.debug("Some tasks did not cancel within timeout - proceeding anyway")
+        except Exception as e:
+            logger.debug(f"Error during final task cleanup: {e}")
 
 
 if __name__ == '__main__':
     try:
         asyncio.run(main())
+        logger.info("Bot shutdown complete")
     except KeyboardInterrupt:
         logger.info("Bot shutdown complete")
+    except Exception as e:
+        logger.error(f"Fatal error during startup: {e}")
+        sys.exit(1)
