@@ -115,9 +115,6 @@ def get_config(self) -> ModuleConfig:
         enabled_by_default=True,    # Should module be enabled when first registered?
         auto_start=True,            # Should module start when bot starts?
         dependencies=["other_mod"], # Modules this depends on
-        config_schema={             # Configuration schema
-            "setting1": {"type": "string", "default": "value"}
-        }
     )
 ```
 
