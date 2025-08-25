@@ -87,10 +87,11 @@ class ModuleManager:
             # Register with registry
             self.registry.register_module(module)
             
-            # If manager is already initialized, set up the module immediately
-            if self._startup_complete:
-                self._setup_module_feature_flags(module.module_name)
-                asyncio.create_task(self._setup_module_database_schema(module.module_name))
+            # Always set up feature flags immediately when module is registered
+            self._setup_module_feature_flags(module.module_name)
+            
+            # Always set up database schema immediately when module is registered
+            asyncio.create_task(self._setup_module_database_schema(module.module_name))
             
             logger.info(f"Successfully registered module: {module.module_name}")
         except Exception as e:
@@ -396,11 +397,17 @@ class ModuleManager:
     async def _setup_module_database_schema(self, module_name: str) -> None:
         """Set up database schema for a specific module."""
         module_def = self.registry.get_module(module_name)
-        if not module_def or not module_def.database_schema:
+        if not module_def:
+            return
+        
+        # Check if module has a database schema - it's optional
+        schema = module_def.database_schema
+        if schema is None or (hasattr(schema, '__len__') and len(schema) == 0):
+            logger.debug(f"Module '{module_name}' has no database schema - skipping database setup")
             return
         
         try:
-            self.schema_manager.declare_schema(module_name, module_def.database_schema)
+            self.schema_manager.declare_schema(module_name, schema)
             logger.debug(f"Set up database schema for module: {module_name}")
         except Exception as e:
             logger.error(f"Failed to set up database schema for module '{module_name}': {e}")

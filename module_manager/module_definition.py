@@ -45,7 +45,6 @@ class ModuleConfig:
     enabled_by_default: bool = True
     auto_start: bool = True
     dependencies: List[str] = field(default_factory=list)
-    config_schema: Dict[str, Any] = field(default_factory=dict)
     
 
 class ModuleLifecycle(Protocol):
