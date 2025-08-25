@@ -39,6 +39,10 @@ load_dotenv()
 # Twitch API configuration
 BROADCASTER_ACCESS_TOKEN = os.getenv('BROADCASTER_ACCESS_TOKEN')
 BROADCASTER_REFRESH_TOKEN = os.getenv('BROADCASTER_REFRESH_TOKEN')
+
+BOT_NAME = os.getenv('BOT_NAME')
+BOT_ACCESS_TOKEN = os.getenv('BOT_ACCESS_TOKEN')
+BOT_REFRESH_TOKEN = os.getenv('BOT_REFRESH_TOKEN')
 APP_ID = os.getenv('BOT_CLIENT_ID')
 APP_SECRET = os.getenv('BOT_CLIENT_SECRET')
 USER_SCOPE = [
@@ -49,8 +53,8 @@ USER_SCOPE = [
     AuthScope.MODERATOR_READ_CHATTERS, 
     AuthScope.MODERATOR_READ_FOLLOWERS,
 ]
+
 TARGET_CHANNEL = os.getenv('TWITCH_CHANNEL')
-BOT_NAME = os.getenv('BOT_NAME')
 COMMAND_PREFIX = os.getenv('COMMAND_PREFIX', '!')
 
 
@@ -128,16 +132,18 @@ class ModularTwitchBot:
             BROADCASTER_REFRESH_TOKEN
         )
         
-        # Initialize bot API (this may spawn OAuth subprocess)
-        logger.debug("Starting OAuth authentication process...")
-        self.process_monitor.track_child_processes()  # Track processes before OAuth
+        # Load bot tokens
+        if not BOT_ACCESS_TOKEN or not BOT_REFRESH_TOKEN:
+            raise ValueError("Bot tokens not found. Please run authentication first.")
+        
+        # Initialize bot API
         self.bot = await Twitch(APP_ID, APP_SECRET)
-        auth = UserAuthenticator(self.bot, USER_SCOPE)
-        token, refresh_token = await auth.authenticate()
-        await self.bot.set_user_authentication(token, USER_SCOPE, refresh_token)
-        self.process_monitor.track_child_processes()  # Track any new processes after OAuth
-        self.process_monitor.track_new_threads()      # Track any new threads
-        logger.debug("OAuth authentication completed")
+        await self.bot.set_user_authentication(
+            BOT_ACCESS_TOKEN, 
+            USER_SCOPE, 
+            BOT_REFRESH_TOKEN
+        )
+        logger.debug("Bot authentication completed using stored tokens")
         
         # Get broadcaster and moderator IDs
         await self._get_user_ids()
