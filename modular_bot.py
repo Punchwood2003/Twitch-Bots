@@ -8,6 +8,7 @@ feature flags, database management, and module lifecycle management.
 import asyncio
 import logging
 import os
+import threading
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -21,11 +22,13 @@ from twitchAPI.twitch import Twitch
 from feature_flags.feature_flags_manager import FeatureFlagManager
 from db.schema_manager import SchemaManager
 from module_manager.module_manager import ModuleManager
+from process_monitoring import ProcessMonitor
 from modules.charity_gambling import CharityGamblingModule
 
 # Setup logging
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -34,6 +37,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Twitch API configuration
+BROADCASTER_ACCESS_TOKEN = os.getenv('BROADCASTER_ACCESS_TOKEN')
+BROADCASTER_REFRESH_TOKEN = os.getenv('BROADCASTER_REFRESH_TOKEN')
 APP_ID = os.getenv('BOT_CLIENT_ID')
 APP_SECRET = os.getenv('BOT_CLIENT_SECRET')
 USER_SCOPE = [
@@ -60,6 +65,7 @@ class ModularTwitchBot:
         self.chat = None
         self.broadcaster_id = None
         self.moderator_id = None
+        self.process_monitor = ProcessMonitor()
         
         # Initialize core systems
         self.feature_flag_manager = FeatureFlagManager(
@@ -81,6 +87,9 @@ class ModularTwitchBot:
     async def initialize(self):
         """Initialize the bot and all systems."""
         logger.info("Initializing Modular Twitch Bot...")
+        
+        # Capture initial process state for monitoring
+        self.process_monitor.capture_initial_state()
         
         # Initialize core systems
         await self.module_manager.initialize()
@@ -108,23 +117,27 @@ class ModularTwitchBot:
         logger.info("Initializing Twitch API...")
         
         # Load broadcaster tokens
-        broadcaster_token, broadcaster_refresh = self._load_broadcaster_tokens()
-        if not broadcaster_token or not broadcaster_refresh:
+        if not BROADCASTER_ACCESS_TOKEN or not BROADCASTER_REFRESH_TOKEN:
             raise ValueError("Broadcaster tokens not found. Please run authentication first.")
         
         # Initialize broadcaster API
         self.broadcaster = await Twitch(APP_ID, APP_SECRET)
         await self.broadcaster.set_user_authentication(
-            broadcaster_token, 
+            BROADCASTER_ACCESS_TOKEN, 
             [AuthScope.CHANNEL_READ_SUBSCRIPTIONS], 
-            broadcaster_refresh
+            BROADCASTER_REFRESH_TOKEN
         )
         
-        # Initialize bot API
+        # Initialize bot API (this may spawn OAuth subprocess)
+        logger.debug("Starting OAuth authentication process...")
+        self.process_monitor.track_child_processes()  # Track processes before OAuth
         self.bot = await Twitch(APP_ID, APP_SECRET)
         auth = UserAuthenticator(self.bot, USER_SCOPE)
         token, refresh_token = await auth.authenticate()
         await self.bot.set_user_authentication(token, USER_SCOPE, refresh_token)
+        self.process_monitor.track_child_processes()  # Track any new processes after OAuth
+        self.process_monitor.track_new_threads()      # Track any new threads
+        logger.debug("OAuth authentication completed")
         
         # Get broadcaster and moderator IDs
         await self._get_user_ids()
@@ -134,19 +147,6 @@ class ModularTwitchBot:
         self.chat.register_event(ChatEvent.READY, self._on_chat_ready)
         
         logger.info("Twitch API initialized")
-    
-    def _load_broadcaster_tokens(self):
-        """Load broadcaster tokens from file."""
-        try:
-            import json
-            token_file = Path("Gambling Charity Bot/broadcaster_token.json")
-            if token_file.exists():
-                with open(token_file, 'r') as f:
-                    data = json.load(f)
-                return data.get('access_token'), data.get('refresh_token')
-        except Exception as e:
-            logger.error(f"Failed to load broadcaster tokens: {e}")
-        return None, None
     
     async def _get_user_ids(self):
         """Get broadcaster and moderator user IDs."""
@@ -208,6 +208,7 @@ class ModularTwitchBot:
     def _register_module_commands(self):
         """Register all module commands with the chat system."""
         commands = self.module_manager.get_registered_commands()
+        registered_count = 0
         
         for command_name, command_def in commands.items():
             # Skip aliases - they're handled by the main command
@@ -216,25 +217,89 @@ class ModularTwitchBot:
                 
             self.chat.register_command(command_name, command_def.handler)
             logger.debug(f"Registered command: {command_name}")
+            registered_count += 1
         
-        logger.info(f"Registered {len(commands)} commands from modules")
+        logger.info(f"Registered {registered_count} commands from modules")
+    
+    def _register_module_commands_for_module(self, module_name: str, module_def):
+        """Register commands for a specific module only."""
+        commands = self.module_manager.registry.get_module(module_name).commands
+        
+        for command in commands:
+            # Register main command
+            self.chat.register_command(command.name, command.handler)
+            logger.debug(f"Registered command: {command.name} for module: {module_name}")
+            
+            # Register aliases
+            for alias in command.aliases:
+                self.chat.register_command(alias, command.handler)
+                logger.debug(f"Registered alias: {alias} for command: {command.name} in module: {module_name}")
+        
+        logger.info(f"Registered {len(commands)} commands for module: {module_name}")
     
     async def stop(self):
         """Stop the bot and all modules."""
         logger.info("Stopping Modular Twitch Bot...")
         
-        if self.chat:
-            self.chat.stop()
-        
-        await self.module_manager.shutdown()
-        
-        if self.bot:
-            await self.bot.close()
-        
-        if self.broadcaster:
-            await self.broadcaster.close()
+        try:
+            # Stop chat first to prevent new messages
+            if self.chat:
+                logger.debug("Stopping chat connection...")
+                self.chat.stop()
+            
+            # Stop all modules and their background tasks
+            logger.debug("Shutting down Module Manager...")
+            await self.module_manager.shutdown()
+            
+            # Close Twitch API connections
+            if self.bot:
+                logger.debug("Closing bot API connection...")
+                await self.bot.close()
+            
+            if self.broadcaster:
+                logger.debug("Closing broadcaster API connection...")
+                await self.broadcaster.close()
+            
+            # Cancel any remaining background tasks
+            await self._cancel_remaining_tasks()
+            
+            # Cleanup all monitored processes and threads
+            if hasattr(self, 'process_monitor') and self.process_monitor:
+                logger.debug("Cleaning up monitored processes and threads...")
+                self.process_monitor.cleanup_all()
+            
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
         
         logger.info("Bot stopped")
+    
+    async def _cancel_remaining_tasks(self):
+        """Cancel any remaining asyncio tasks."""
+        try:
+            # Get all tasks except the current one
+            current_task = asyncio.current_task()
+            all_tasks = [task for task in asyncio.all_tasks() if task is not current_task]
+            
+            if all_tasks:
+                logger.debug(f"Cancelling {len(all_tasks)} remaining background tasks...")
+                
+                # Cancel all tasks
+                for task in all_tasks:
+                    if not task.done():
+                        task.cancel()
+                
+                # Wait for tasks to complete cancellation with timeout
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*all_tasks, return_exceptions=True),
+                        timeout=5.0  # 5 second timeout
+                    )
+                    logger.debug("All background tasks cancelled")
+                except asyncio.TimeoutError:
+                    logger.warning("Some background tasks did not respond to cancellation within 5 seconds")
+            
+        except Exception as e:
+            logger.warning(f"Error cancelling background tasks: {e}")
     
     async def _on_module_started(self, module_name: str, module_def):
         """Handle module started event."""
@@ -249,9 +314,9 @@ class ModularTwitchBot:
                 self.moderator_id
             )
         
-        # Re-register commands to include new module commands
+        # Register commands only for this specific module (not all modules)
         if self.chat:
-            self._register_module_commands()
+            self._register_module_commands_for_module(module_name, module_def)
     
     async def _on_module_stopped(self, module_name: str, module_def):
         """Handle module stopped event."""
@@ -279,6 +344,12 @@ async def main():
     """Main application entry point."""
     bot = ModularTwitchBot()
     
+    def signal_handler():
+        """Handle shutdown signals gracefully."""
+        logger.info("Shutdown signal received...")
+        # Create a task to stop the bot
+        asyncio.create_task(bot.stop())
+    
     try:
         # Initialize the bot
         await bot.initialize()
@@ -287,19 +358,26 @@ async def main():
         await bot.start()
         
         # Keep the bot running
-        print("Bot is running. Press Ctrl+C to stop...")
+        logger.debug("Gambling Charity Bot is running. Press Ctrl+C to stop...")
         try:
             while True:
                 await asyncio.sleep(1)
         except KeyboardInterrupt:
-            print("\nShutdown signal received...")
+            logger.info("\nShutdown signal received...")
         
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         raise
     finally:
-        await bot.stop()
+        # Ensure cleanup always happens
+        try:
+            await bot.stop()
+        except Exception as e:
+            logger.error(f"Error during final cleanup: {e}")
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Bot shutdown complete")
