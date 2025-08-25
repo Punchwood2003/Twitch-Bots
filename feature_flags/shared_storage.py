@@ -6,6 +6,7 @@ of feature flag data that can be shared across multiple manager instances.
 """
 
 import json
+import logging
 import threading
 import time
 from pathlib import Path
@@ -15,22 +16,70 @@ from watchdog.events import FileSystemEventHandler
 from .permission_types import FlagOwnership
 
 
+# Set up logger
+logger = logging.getLogger(__name__)
+
+
 class SharedFileHandler(FileSystemEventHandler):
     """File system event handler for feature flag configuration files."""
     
     def __init__(self, storage: 'SharedFlagStorage'):
         self.storage = storage
+        self._last_event_time = 0.0
+        self._event_count = 0
+        self._startup_grace_period = 5.0  # Suppress spam for first 5 seconds
+        self._creation_time = time.time()
+    
+    def _should_handle_event(self, file_path: str) -> bool:
+        """Check if we should handle this file event."""
+        target_path = str(self.storage.config_path.absolute())
+        event_path = str(Path(file_path).absolute())
+        return event_path == target_path
+    
+    def _should_log_event(self) -> bool:
+        """Determine if we should log this event or suppress it."""
+        current_time = time.time()
+        
+        # Suppress events during startup grace period if they're rapid
+        if current_time - self._creation_time < self._startup_grace_period:
+            if current_time - self._last_event_time < 0.1:  # Events within 100ms
+                self._event_count += 1
+                if self._event_count > 3:  # After 3 rapid events, suppress logging
+                    return False
+            else:
+                self._event_count = 0  # Reset count if gap is larger
+        
+        self._last_event_time = current_time
+        return True
     
     def on_modified(self, event):
         """Handle file modification events."""
-        if not event.is_directory and event.src_path == str(self.storage.config_path):
+        if not event.is_directory and self._should_handle_event(event.src_path):
+            if self._should_log_event():
+                logger.debug(f"Feature flags file modified: {event.src_path}")
+            self.storage._reload_config()
+    
+    def on_created(self, event):
+        """Handle file creation events."""
+        # Some editors create new files instead of modifying existing ones
+        if not event.is_directory and self._should_handle_event(event.src_path):
+            if self._should_log_event():
+                logger.debug(f"Feature flags file created: {event.src_path}")
+            self.storage._reload_config()
+    
+    def on_moved(self, event):
+        """Handle file move events."""
+        # Some editors use atomic writes (move temp file to target)
+        if not event.is_directory and self._should_handle_event(event.dest_path):
+            if self._should_log_event():
+                logger.debug(f"Feature flags file moved (atomic write): {event.dest_path}")
             self.storage._reload_config()
 
 
 class SharedFlagStorage:
     """Shared storage and file watching for a specific config file."""
     
-    def __init__(self, config_path: Path, debounce_seconds: float = 0.1):
+    def __init__(self, config_path: Path, debounce_seconds: float = 0.2):
         self.config_path = config_path
         self.debounce_seconds = debounce_seconds
         self._cache: Dict[str, Any] = {}
@@ -67,21 +116,29 @@ class SharedFlagStorage:
         try:
             self.observer = Observer()
             handler = SharedFileHandler(self)
-            self.observer.schedule(handler, str(self.config_path.parent), recursive=False)
+            watch_directory = str(self.config_path.parent)
+            self.observer.schedule(handler, watch_directory, recursive=False)
             self.observer.start()
+            logger.debug(f"File watcher started for {self.config_path}")
         except Exception as e:
-            print(f"Warning: Could not set up file watcher for {self.config_path}: {e}")
+            logger.warning(f"Could not set up file watcher for {self.config_path}: {e}")
             self.observer = None
     
     def _reload_config(self):
         """Reload configuration from file with debouncing."""
         current_time = time.time()
         
-        # Debounce rapid file changes
+        # More aggressive debouncing to handle rapid editor events
         if current_time - self._last_reload < self.debounce_seconds:
+            # Only log debounced events occasionally to reduce log spam
+            if current_time - self._last_reload > 0.05:  # Only log if gap > 50ms
+                logger.debug(f"Config reload debounced ({current_time - self._last_reload:.2f}s since last reload)")
             return
         
+        logger.debug(f"Reloading feature flags from {self.config_path}")
+        
         with self._lock:
+            self._last_reload = current_time  # Update timestamp before processing
             try:
                 if not self.config_path.exists():
                     return
@@ -117,13 +174,13 @@ class SharedFlagStorage:
                     self._descriptions = {}
                     self._ownership_registry = {}
                 
-                self._last_reload = current_time
-                
                 # Call observers for changed values
                 self._notify_observers(old_cache, self._cache)
                 
+                logger.info(f"Feature flags reloaded successfully, {len(self._cache)} flags in cache")
+                
             except Exception as e:
-                print(f"Error reloading config from {self.config_path}: {e}")
+                logger.error(f"Error reloading config from {self.config_path}: {e}")
     
     def _notify_observers(self, old_config: Dict[str, Any], new_config: Dict[str, Any]):
         """Notify observers of configuration changes."""
@@ -136,7 +193,7 @@ class SharedFlagStorage:
                     try:
                         callback(flag_name, old_value, new_value)
                     except Exception as e:
-                        print(f"Error in observer callback for {flag_name}: {e}")
+                        logger.error(f"Error in observer callback for {flag_name}: {e}")
     
     def write_config(self, flags: Dict[str, Any], descriptions: Dict[str, str], ownership_info: Dict[str, FlagOwnership]):
         """Write configuration with consolidated ownership info in user-friendly format."""
@@ -217,7 +274,7 @@ class SharedFlagStorage:
                 try:
                     callback(flag_name, old_value, new_value)
                 except Exception as e:
-                    print(f"Error in observer callback for {flag_name}: {e}")
+                    logger.error(f"Error in observer callback for {flag_name}: {e}")
     
     def set_flag_description(self, flag_name: str, description: str):
         """Set a specific flag description (thread-safe)."""
